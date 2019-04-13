@@ -1,0 +1,152 @@
+---
+title: "MUSSER-GRACE-ADA-HOMEWORK-04"
+author: "Grace Musser"
+date: "4/9/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(curl)
+library(readr)
+library(boot)
+library(simpleboot)
+```
+
+[1] Using the “KamilarAndCooperData.csv” dataset, run a linear regression looking at log(HomeRange_km2) in relation to log(Body_mass_female_mean) and report your β
+ coeffiecients (slope and intercept).
+
+```{r}
+#First, read in the Kamilar and Cooper dataset:
+f <- curl("https://raw.githubusercontent.com/difiore/ADA-2019/master/KamilarAndCooperData.csv")
+d <- read.csv(f, header = TRUE, sep = ",", stringsAsFactors = TRUE)
+head(d)
+```
+
+```{r}
+#Create a linear regression model for log (HomeRange_km2) in relation to log(Body_mass_female_mean)
+m<-lm(log(d$HomeRange_km2) ~ log(d$Body_mass_female_mean))
+m
+summary(m) #report coefficients
+```
+
+```{r}
+confint(m) #get confidence intervals for the model
+```
+
+
+[2] Then, use bootstrapping to sample from your data 1000 times with replacement, each time fitting the same model and calculating the appropriate coefficients. This generates a sampling distribution for each β
+ coefficient. Plot a histogram of these sampling distributions.
+ 
+
+```{r}
+n <- length(d[,1]) #make sure that n matches the length of the dataset
+t <- 1000 #sample times
+boots <- d[sample(nrow(d), n, replace = TRUE), ] #create bootstrap with replacement
+str(boots)
+b0 <- rep(0,t) #beta0 values vector
+b1 <- rep(0,t) #beta1 values vector
+
+for (i in 1:t){
+  boots <- d[sample(nrow(d), n, replace = TRUE), ] #boottrap with replacement
+  m <- lm(data = boots, formula = log(HomeRange_km2) ~ log(Body_mass_female_mean)) #define model
+  b0[i] <- m$coefficients[1] #add model coefficients to vectors
+  b1[i] <- m$coefficients[2] 
+  }
+
+
+head(b1)
+head(b0)
+par(mfrow = c(1,2)) #plot histogram
+hist(b0, breaks = 20)
+hist(b1, breaks = 20)
+par(mfrow = c(1,1))
+```
+
+[3] Estimate the standard error for each of your β
+ coefficients as the standard deviation of the sampling distribution from your bootstrap.
+
+```{r}
+SEb0 <- sd(b0) #get standard error for beta coefficients
+SEb0
+SEb1 <- sd(b1)
+SEb1
+```
+
+
+[4] Also determine the 95% CI for each of your β
+ coefficients based on the appropriate quantiles from your sampling distribution.
+ 
+```{r}
+b0_CI_upper <- mean(b0) + qnorm(0.975) * SEb0 #get confidence errors based on quantiles using means of betas
+b0_CI_lower <- mean(b0) - qnorm(0.975) * SEb0
+b0_CI_upper
+b0_CI_lower
+b1_CI_upper <- mean(b1) + qnorm(0.975) * SEb1
+b1_CI_lower <- mean(b1) - qnorm(0.975) * SEb1
+b1_CI_lower
+b1_CI_upper
+```
+
+[5] How does your answer to part [3] compare to the SE estimated from your entire dataset using the formula  for standard error implemented in lm()?
+
+The original estimates were 0.67293 and 0.08488, whereas those estimated from the bootstrap were 0.6120576 and 0.07923245. The bootstrap standard errors were similar but slightly lower than the original estimates.
+
+[6] How does your answer to part [4] compare to the 95% CI estimated from your entire dataset?
+
+The original confidence interval estimates -10.7720889 to -8.110374 and 0.8685707 to 1.204292, whereas the bootstrap estimates were -10.66909 to -8.26987 and 0.8839389 to 1.194524. Thus they are nearly identical.
+
+EXTRA CREDIT: + 2
+
+Write a FUNCTION that takes as its arguments a dataframe (“d”), a linear model (“m”, as a character string, e.g., “logHR~logBM”), a user-defined confidence interval level (“conf.level”) with default = 0.95, and a number of bootstrap replicates (“n”, with default = 1000). Your function should return a dataframe that includes: beta coefficient names; beta coefficients, standard errors, and upper and lower CI limits for the linear model based on your entire dataset; and mean beta coefficient estimates, SEs, and CI limits for those coefficients based on your bootstrap.
+
+
+```{r}
+
+f<-function(d, m, conf.level=0.95, t=1000){
+  m<-lm(log(d$HomeRange_km2) ~ log(d$Body_mass_female_mean))
+  s<-summary(m)
+  ci<-confint(m)
+  dsample <- d[sample(nrow(d), n, replace = T), ]
+  head(dsample)
+  str(dsample)
+  n <- length(d[,1]) #make sure that n matches the length of the dataset
+  boots <- d[sample(nrow(d), n, replace = TRUE), ] #create bootstrap with replacement
+  str(boots)
+  b0 <- rep(0,t) #beta0 values vector
+  b1 <- rep(0,t) #beta1 values vector
+  for (i in 1:t){
+    boots <- d[sample(nrow(d), n, replace = TRUE), ] #boottrap with replacement
+    m <- lm(data = boots, formula = log(HomeRange_km2) ~ log(Body_mass_female_mean)) #define model
+    b0[i] <- m$coefficients[1] #add model coefficients to vectors
+    b1[i] <- m$coefficients[2] 
+    }
+  SEb0 <- sd(b0) #get standard error for beta coefficients
+  SEb0
+  SEb1 <- sd(b1)
+  SEb1
+  b0_CI_upper <- mean(b0) + qnorm(0.975) * SEb0 #get confidence errors based on quantiles using means of betas
+  b0_CI_lower <- mean(b0) - qnorm(0.975) * SEb0
+  b0CI<-c(b0_CI_upper, b0_CI_lower)
+  b1_CI_upper <- mean(b1) + qnorm(0.975) * SEb1
+  b1_CI_lower <- mean(b1) - qnorm(0.975) * SEb1
+  b0CI<-c(b1_CI_lower, b1_CI_upper)
+  print(s)
+  print(ci)
+  print(b0CI, b0CI)
+  print(SEb0)
+  print(SEb1)
+  }
+
+
+```
+
+```{r}
+f(d, m, conf.level, n)
+```
+
+
